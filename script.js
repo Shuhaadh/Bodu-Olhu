@@ -350,3 +350,193 @@ function handleSwipeGesture() {
     }
 }
 
+
+
+// Add these functions to your existing script.js file
+
+// Service booking modal function
+function openServiceModal(serviceName, servicePrice) {
+    currentBoard = {
+        id: 0,
+        name: serviceName,
+        price: servicePrice
+    };
+    
+    if (currentBoard) {
+        document.getElementById('modal-title').textContent = `Book ${currentBoard.name}`;
+        
+        // Update the form for service booking
+        updateFormForService(serviceName);
+        
+        document.getElementById('booking-modal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+// Update form for different services
+function updateFormForService(serviceName) {
+    const form = document.getElementById('booking-form');
+    
+    // Add service-specific fields if needed
+    if (serviceName.includes('Group')) {
+        // Add number of participants field if not exists
+        if (!document.getElementById('participant-count')) {
+            const participantGroup = document.createElement('div');
+            participantGroup.className = 'form-group';
+            participantGroup.innerHTML = `
+                <label for="participant-count">Number of Participants (max 5)</label>
+                <select id="participant-count" name="participantCount" required>
+                    <option value="">Select number</option>
+                    <option value="1">1 person</option>
+                    <option value="2">2 people</option>
+                    <option value="3">3 people</option>
+                    <option value="4">4 people</option>
+                    <option value="5">5 people</option>
+                </select>
+            `;
+            
+            // Insert before experience level
+            const experienceGroup = document.querySelector('#experience-level').closest('.form-group');
+            form.insertBefore(participantGroup, experienceGroup);
+        }
+    } else {
+        // Remove participant count field if it exists
+        const participantGroup = document.getElementById('participant-count');
+        if (participantGroup) {
+            participantGroup.closest('.form-group').remove();
+        }
+    }
+
+    // Update duration options for lessons
+    const durationSelect = document.getElementById('rental-duration');
+    const durationLabel = durationSelect.previousElementSibling;
+    
+    if (serviceName.includes('Lesson') || serviceName.includes('Coaching')) {
+        durationLabel.textContent = 'Preferred Time';
+        durationSelect.innerHTML = `
+            <option value="">Select time slot</option>
+            <option value="morning">Morning (8:00 AM - 10:00 AM)</option>
+            <option value="midday">Midday (11:00 AM - 1:00 PM)</option>
+            <option value="afternoon">Afternoon (2:00 PM - 4:00 PM)</option>
+            <option value="evening">Evening (5:00 PM - 7:00 PM)</option>
+        `;
+    } else {
+        durationLabel.textContent = 'Duration';
+        durationSelect.innerHTML = `
+            <option value="">Select duration</option>
+            <option value="half-day">Half Day (4 hours) - $25</option>
+            <option value="full-day">Full Day (8 hours) - $40</option>
+            <option value="2-days">2 Days - $70</option>
+            <option value="week">1 Week - $200</option>
+        `;
+    }
+}
+
+// Update the existing setupBookingForm function to handle services
+function setupBookingForm() {
+    const form = document.getElementById('booking-form');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Get form data
+        const formData = new FormData(form);
+        const bookingData = {
+            service: currentBoard.name, // Changed from 'board' to 'service'
+            customer: formData.get('customerName'),
+            email: formData.get('customerEmail'),
+            phone: formData.get('customerPhone'),
+            date: formData.get('rentalDate'),
+            timeSlot: formData.get('rentalDuration'), // This could be time slot for lessons
+            experience: formData.get('experienceLevel'),
+            participants: formData.get('participantCount') || '1'
+        };
+        
+        // Send email notification via EmailJS
+        sendServiceNotification(bookingData);
+    });
+}
+
+// Updated email notification function for services
+function sendServiceNotification(bookingData) {
+    // Initialize EmailJS with your public key
+    emailjs.init("OIg3XqQox8JJR8n4P");
+    
+    const templateParams = {
+        customer_name: bookingData.customer,
+        customer_email: bookingData.email,
+        customer_phone: bookingData.phone,
+        service_name: bookingData.service, // Changed from board_name
+        booking_date: bookingData.date,
+        time_slot: bookingData.timeSlot,
+        experience_level: bookingData.experience,
+        participant_count: bookingData.participants,
+        booking_time: new Date().toLocaleString()
+    };
+    
+    // Send email using your EmailJS service and template IDs
+    emailjs.send("service_ze41a1i", "template_m2hhxo2", templateParams)
+        .then(function(response) {
+            console.log('Email sent successfully:', response);
+            showServiceSuccessMessage(bookingData);
+        })
+        .catch(function(error) {
+            console.error('Email failed:', error);
+            showServiceSuccessMessage(bookingData);
+        });
+}
+
+// Success message for services
+function showServiceSuccessMessage(bookingData) {
+    const form = document.getElementById('booking-form');
+    const successMessage = document.createElement('div');
+    successMessage.className = 'success-message';
+    
+    let messageContent = `
+        <strong>Booking Submitted!</strong><br>
+        Thank you ${bookingData.customer}! Your ${bookingData.service} booking has been sent.
+    `;
+    
+    if (bookingData.service.includes('Group') && bookingData.participants > 1) {
+        messageContent += `<br>For ${bookingData.participants} participants.`;
+    }
+    
+    messageContent += `<br>We'll contact you within 24 hours to confirm details.`;
+    
+    successMessage.innerHTML = messageContent;
+    
+    form.insertBefore(successMessage, form.firstChild);
+    
+    // Clear form and close modal after 3 seconds
+    setTimeout(() => {
+        closeModal();
+        // Remove participant count field when closing
+        const participantGroup = document.getElementById('participant-count');
+        if (participantGroup) {
+            participantGroup.closest('.form-group').remove();
+        }
+        
+        setTimeout(() => {
+            if (successMessage.parentNode) {
+                successMessage.remove();
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Update navigation to include new sections
+document.addEventListener('DOMContentLoaded', function() {
+    // Update existing navigation
+    const navLinks = document.querySelectorAll('.nav-links a, .mobile-menu-links a');
+    navLinks.forEach(link => {
+        if (link.getAttribute('href') === '#about') {
+            link.setAttribute('href', '#lessons');
+            link.textContent = 'Lessons';
+        }
+        if (link.getAttribute('href') === '#contact') {
+            link.setAttribute('href', '#pricing');
+            link.textContent = 'Pricing';
+        }
+    });
+});
+
